@@ -11,7 +11,6 @@ public class Dijkstra {
         int destino;
         int peso;
 
-        public Aresta() {}
         public Aresta(int destino, int peso) {
             this.destino = destino;
             this.peso = peso;
@@ -43,8 +42,7 @@ public class Dijkstra {
         Map<Integer, Integer> distancias = new HashMap<>();
 
         PriorityQueue<NoDistancia> filaPrioridade = new PriorityQueue<>(
-            (nd1, nd2) -> Integer.compare(nd1.distancia, nd2.distancia)
-        );
+                (nd1, nd2) -> Integer.compare(nd1.distancia, nd2.distancia));
 
         for (int vertice : grafo.keySet()) {
             distancias.put(vertice, Integer.MAX_VALUE);
@@ -52,9 +50,8 @@ public class Dijkstra {
 
         distancias.put(origem, 0);
         filaPrioridade.add(new NoDistancia(origem, 0));
-        return distancias;
 
-        /*while (!filaPrioridade.isEmpty()) {
+        while (!filaPrioridade.isEmpty()) {
             NoDistancia atual = filaPrioridade.poll();
             int u = atual.vertice;
             int distanciaU = atual.distancia;
@@ -63,9 +60,25 @@ public class Dijkstra {
                 continue;
             }
 
-            List<Aresta> vizinhos = grafo.getOrDefault(u, new ArrayList<>());
+            if (!grafo.containsKey(u)) {
+                continue;
+            }
 
+            List<Aresta> vizinhos = grafo.get(u);
 
-        }*/
+            for (Aresta aresta : vizinhos) {
+                int v = aresta.destino;
+                int pesoUV = aresta.peso;
+
+                int novaDistancia = distanciaU + pesoUV;
+
+                if (novaDistancia < distancias.getOrDefault(v, Integer.MAX_VALUE)) {
+                    distancias.put(v, novaDistancia);
+                    filaPrioridade.add(new NoDistancia(v, novaDistancia));
+                }
+            }
+        }
+
+        return distancias;
     }
 }
