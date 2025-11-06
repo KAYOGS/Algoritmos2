@@ -1,0 +1,21 @@
+Algoritmo Dijkstra(G, S):
+
+  Para cada Vértice V em G.V:
+    Dist[V] = Infinito
+    Prev[V] = Indefinido
+
+  Dist[S] = 0
+  
+  Q = todos os vértices de G.V
+  Enquanto Q não está vazio:
+    
+    U = Extrai o vértice de Q com a menor Dist[U]
+    
+    Para cada V vizinho de U:
+      alt = Dist[U] + Custo da aresta(U, V)
+
+      Se alt < Dist[V]:
+        Dist[V] = alt
+        Prev[V] = U
+
+Retorna Dist, Prev
