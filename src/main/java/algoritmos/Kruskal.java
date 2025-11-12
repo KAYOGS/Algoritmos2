@@ -5,69 +5,75 @@ import java.util.Collections;
 import java.util.List;
 
 class Aresta implements Comparable<Aresta> {
-   int origem, destino, peso;
 
-   public Aresta(int origem, int destino, int peso) {
-      this.origem = origem;
-      this.destino = destino;
-      this.peso = peso;
-   }
+    int origem, destino, peso;
 
-   public int compareTo(Aresta outra) {
-      return this.peso - outra.peso;
-   }
+    public Aresta(int origem, int destino, int peso) {
+        this.origem = origem;
+        this.destino = destino;
+        this.peso = peso;
+    }
+
+    @Override
+    public int compareTo(Aresta outra) {
+        return this.peso - outra.peso;
+    }
 }
 
 public class Kruskal {
-   private int numVertices;
-   private List<Aresta> listaArestas;
 
-   public Kruskal(int numVertices) {
-      this.numVertices = numVertices;
-      this.listaArestas = new ArrayList<>();
-   }
+    private final int numVertices;
+    private final List<Aresta> listaArestas;
 
-   public void adicionarAresta(int origem, int destino, int peso) {
-      listaArestas.add(new Aresta(origem, destino, peso));
-   }
+    public Kruskal(int numVertices) {
+        this.numVertices = numVertices;
+        this.listaArestas = new ArrayList<>();
+    }
 
-   public void executar() {
-      Collections.sort(listaArestas);
+    public void adicionarAresta(int origem, int destino, int peso) {
+        listaArestas.add(new Aresta(origem, destino, peso));
+    }
 
-      int[] conjunto = new int[numVertices];
+    public int executar() {
+        Collections.sort(listaArestas);
 
-      for (int i = 0; i < numVertices; i++) conjunto[i] = i;
+        int[] conjunto = new int[numVertices]; 
 
-      List<Aresta> agm = new ArrayList<>();
+        for (int i = 0; i < numVertices; i++) {
+            conjunto[i] = i;
+        }
 
-      for (Aresta aresta : listaArestas) {
-         int raizOrigem = encontrarRaiz(conjunto, aresta.origem);
-         int raizDestino = encontrarRaiz(conjunto, aresta.destino);
+        int custoTotalAGM = 0;
+        int arestasAdicionadas = 0;
 
-         if (raizOrigem != raizDestino) {
-            agm.add(aresta);
-            unirConjuntos(conjunto, raizOrigem, raizDestino);
-         }
-         if (agm.size() == numVertices - 1) break;
-      }
+        for (Aresta aresta : listaArestas) {
+            int raizOrigem = encontrarRaiz(conjunto, aresta.origem);
+            int raizDestino = encontrarRaiz(conjunto, aresta.destino);
 
-      System.out.println("Arvore Geradora Minima:");
-      for (Aresta aresta : agm) {
-         System.out.println(aresta.origem + " - " + aresta.destino + " : " + aresta.peso);
-      }
-   }
+            if (raizOrigem != raizDestino) {
+                custoTotalAGM += aresta.peso;
+                arestasAdicionadas++;
+                unirConjuntos(conjunto, raizOrigem, raizDestino);
+            }
+            if (arestasAdicionadas == numVertices - 1) {
+                break;
+            }
+        }
 
-   private int encontrarRaiz(int[] conjunto, int i) {
-      if (conjunto[i] != i) {
-         conjunto[i] = encontrarRaiz(conjunto, conjunto[i]);
-      }
-      
-      return conjunto[i];
-   }
+        return custoTotalAGM;
+    }
 
-   private void unirConjuntos(int[] conjunto, int x, int y) {
-      int raizX = encontrarRaiz(conjunto, x);
-      int raizY = encontrarRaiz(conjunto, y);
-      conjunto[raizX] = raizY;
-   }
+    private int encontrarRaiz(int[] conjunto, int i) {
+        if (conjunto[i] != i) {
+            conjunto[i] = encontrarRaiz(conjunto, conjunto[i]);
+        }
+
+        return conjunto[i];
+    }
+
+    private void unirConjuntos(int[] conjunto, int x, int y) {
+        int raizX = encontrarRaiz(conjunto, x);
+        int raizY = encontrarRaiz(conjunto, y);
+        conjunto[raizX] = raizY;
+    }
 }

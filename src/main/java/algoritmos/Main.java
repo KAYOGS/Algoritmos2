@@ -1,225 +1,170 @@
 package algoritmos;
 
-import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartUtils;
-import org.jfree.chart.JFreeChart;
-import org.jfree.data.xy.XYSeries;
-import org.jfree.data.xy.XYSeriesCollection;
+import java.io.IOException;
 
 import com.itextpdf.text.Document;
 import com.itextpdf.text.Font;
-import com.itextpdf.text.Image;
 import com.itextpdf.text.Paragraph;
 import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
 
 public class Main {
+
+    private static class ResultadoExecucao {
+        long custo;
+        double tempoSegundos;
+
+        public ResultadoExecucao(long custo, double tempoSegundos) {
+            this.custo = custo;
+            this.tempoSegundos = tempoSegundos;
+        }
+    }
+
     public static void main(String[] args) {
-        int[] sizes = { 100000, 160000, 220000, 280000, 340000, 400000, 460000, 520000, 580000, 640000, 700000 };
+        Map<String, String> instancias = new LinkedHashMap<>();
+        instancias.put("NY_dist", "NY_dist.gr");
+        instancias.put("BAY_dist", "BAY_dist.gr");
+        instancias.put("COL_dist", "COL_dist.gr");
+        
+        Map<String, Map<String, ResultadoExecucao>> resultadosTabela = new LinkedHashMap<>();
 
         try {
+            for (Map.Entry<String, String> entrada : instancias.entrySet()) {
+                String nomeInstancia = entrada.getKey();
+                String caminhoArquivo = entrada.getValue();
+
+                GrafoReader reader;
+                try {
+                    reader = new GrafoReader(caminhoArquivo);
+                } catch (IOException | IllegalArgumentException e) {
+                    System.err.println("ERRO ao carregar o arquivo " + caminhoArquivo + ": " + e.getMessage());
+                    Map<String, ResultadoExecucao> erroResult = new HashMap<>();
+                    erroResult.put("CM", new ResultadoExecucao(-1, 0.0));
+                    erroResult.put("AGM_Prim", new ResultadoExecucao(-1, 0.0));
+                    erroResult.put("AGM_Kruskal", new ResultadoExecucao(-1, 0.0));
+                    erroResult.put("FM", new ResultadoExecucao(-1, 0.0));
+                    resultadosTabela.put(nomeInstancia + " (ERRO)", erroResult);
+                    continue;
+                }
+                
+                int n = reader.getNumVertices();
+                int m = reader.getNumArestas();
+                int verticeInicial = reader.getVerticeInicial();
+                int verticeFinalCM = n > 0 ? n - 1 : verticeInicial; 
+
+                Map<String, ResultadoExecucao> resultadosInstancia = new LinkedHashMap<>();
+
+                long custoCM = 0;
+                long startCM = System.nanoTime();
+                Map<Integer, Integer> distancias = reader.getDijkstra().encontrarMenorCaminho(verticeInicial);
+                long endCM = System.nanoTime();
+                double tempoCM = (endCM - startCM) / 1_000_000_000.0; 
+
+                Integer distanciaDestino = distancias.get(verticeFinalCM);
+                if (distanciaDestino != null && distanciaDestino != Integer.MAX_VALUE) {
+                    custoCM = distanciaDestino;
+                } else {
+                    custoCM = -1;
+                }
+                resultadosInstancia.put("CM", new ResultadoExecucao(custoCM, tempoCM));
+
+                long startPrim = System.nanoTime();
+                long custoPrim = reader.getPrim().executar(verticeInicial);
+                long endPrim = System.nanoTime();
+                double tempoPrim = (endPrim - startPrim) / 1_000_000_000.0;
+                resultadosInstancia.put("AGM_Prim", new ResultadoExecucao(custoPrim, tempoPrim));
+                
+                long startKruskal = System.nanoTime();
+                long custoKruskal = reader.getKruskal().executar();
+                long endKruskal = System.nanoTime();
+                double tempoKruskal = (endKruskal - startKruskal) / 1_000_000_000.0;
+                resultadosInstancia.put("AGM_Kruskal", new ResultadoExecucao(custoKruskal, tempoKruskal));
+                
+                resultadosInstancia.put("FM", new ResultadoExecucao(0, 0.0)); 
+                
+                resultadosTabela.put(nomeInstancia + "|" + n + "|" + m, resultadosInstancia);
+            }
+            
             Document document = new Document();
-            PdfWriter.getInstance(document, new FileOutputStream("Relatorio_Sorts.pdf"));
+            PdfWriter.getInstance(document, new FileOutputStream("Relatorio_Grafos.pdf"));
             document.open();
 
             Font titleFont = new Font(Font.FontFamily.HELVETICA, 16, Font.BOLD);
-            document.add(new Paragraph("Relatorio Comparativo de Algoritmos de Ordenacao", titleFont));
-            document.add(new Paragraph(" "));
-            document.add(new Paragraph("Analise Teorica:", titleFont));
-            document.add(new Paragraph(" "));
+            Font headerFont = new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD);
 
-            document.add(new Paragraph("Bubble Sort:"));
-            document.add(
-                    new Paragraph(" - Complexidade de Tempo: O(n) no melhor caso. O(n2) no caso medio e pior caso."));
-            document.add(new Paragraph(" - Complexidade de Espaco: O(1)."));
-            document.add(new Paragraph(" - Notas: Extremamente ineficiente para grandes volumes de dados."));
-
+            document.add(new Paragraph("Relatório Comparativo de Algoritmos de Grafos", titleFont));
             document.add(new Paragraph(" "));
-            document.add(new Paragraph("Merge Sort:"));
-            document.add(new Paragraph(" - Complexidade de Tempo: O(n log n) em todos os casos."));
-            document.add(new Paragraph(" - Complexidade de Espaco: O(n)."));
-            document.add(new Paragraph(" - Notas: Eficiente e estavel, mas consome mais memoria."));
+            
+            document.add(new Paragraph("Análise dos Algoritmos (CM e AGM)", headerFont));
+            document.add(new Paragraph(" "));
+            
+            document.add(new Paragraph("Dijkstra (Caminho Mínimo - CM):"));
+            document.add(new Paragraph(" - Complexidade de Tempo: O(E + V log V) com Fila de Prioridade."));
+            document.add(new Paragraph(" - Notas: Encontra o caminho de menor custo de uma origem a todos os outros vértices em grafos com pesos não negativos."));
 
             document.add(new Paragraph(" "));
-            document.add(new Paragraph("Quick Sort:"));
-            document.add(new Paragraph(" - Complexidade de Tempo: O(n log n) no caso medio. O(n2) no pior caso."));
-            document.add(
-                    new Paragraph(" - Complexidade de Espaco: O(log n) a O(n)."));
-            document.add(
-                    new Paragraph(" - Notas: Um dos mais rapidos na pratica, mas sensivel a entrada no pior caso."));
+            document.add(new Paragraph("Prim (Árvore Geradora Mínima - AGM):"));
+            document.add(new Paragraph(" - Complexidade de Tempo: O(E log V) ou O((V+E) log V)."));
+            document.add(new Paragraph(" - Notas: Algoritmo guloso que constrói a AGM a partir de um vértice inicial."));
 
             document.add(new Paragraph(" "));
-            document.add(new Paragraph("Heap Sort:"));
-            document.add(new Paragraph(" - Complexidade de Tempo: O(n log n) em todos os casos."));
-            document.add(new Paragraph(" - Complexidade de Espaco: O(1)."));
-            document.add(new Paragraph(" - Notas: Eficiente, estavel e usa pouca memoria."));
+            document.add(new Paragraph("Kruskal (Árvore Geradora Mínima - AGM):"));
+            document.add(new Paragraph(" - Complexidade de Tempo: O(E log E) ou O(E log V) se V < E."));
+            document.add(new Paragraph(" - Notas: Algoritmo guloso que ordena as arestas e usa a estrutura Disjoint Set (Union-Find)."));
 
             document.add(new Paragraph(" "));
-            document.add(new Paragraph("Insertion Sort:"));
-            document.add(
-                    new Paragraph(" - Complexidade de Tempo: O(n) no melhor caso. O(n2) no caso medio e pior caso."));
-            document.add(new Paragraph(" - Complexidade de Espaco: O(1)."));
-            document.add(new Paragraph(" - Notas: Extremamente rapido para dados quase ordenados."));
-
-            document.add(new Paragraph(" "));
-            document.add(new Paragraph("Selection Sort:"));
-            document.add(new Paragraph(" - Complexidade de Tempo: O(n2) em todos os casos."));
-            document.add(new Paragraph(" - Complexidade de Espaco: O(1)."));
-            document.add(new Paragraph(" - Notas: Sempre realiza o mesmo numero de comparacoes."));
-
+            document.add(new Paragraph("Tabelas de Resultados", titleFont));
             document.add(new Paragraph(" "));
 
-            List<PdfPTable> tables = new ArrayList<>();
-            List<Image> charts = new ArrayList<>();
-            List<String> labels = new ArrayList<>();
+            PdfPTable table = new PdfPTable(8);
+            table.setWidthPercentage(100);
+            
+            table.addCell(new Paragraph("n", headerFont));
+            table.addCell(new Paragraph("m", headerFont));
+            table.addCell(new Paragraph("CM Custo (Dijkstra)", headerFont));
+            table.addCell(new Paragraph("CM Tempo (s)", headerFont));
+            table.addCell(new Paragraph("AGM Custo (Kruskal)", headerFont));
+            table.addCell(new Paragraph("AGM Tempo (s)", headerFont));
+            table.addCell(new Paragraph("FM Custo", headerFont));
+            table.addCell(new Paragraph("FM Tempo (s)", headerFont));
 
-            String[] tiposEntrada = {
-                    "Crescente com repeticao", "Decrescente com repeticao", "Aleatorio com repeticao",
-                    "Crescente sem repeticao", "Decrescente sem repeticao", "Aleatorio sem repeticao"
-            };
+            for (Map.Entry<String, Map<String, ResultadoExecucao>> entry : resultadosTabela.entrySet()) {
+                String[] info = entry.getKey().split("\\|");
+                int n = Integer.parseInt(info[1]);
+                int m = Integer.parseInt(info[2]);
+                
+                Map<String, ResultadoExecucao> res = entry.getValue();
 
-            for (String tipo : tiposEntrada) {
-                Map<String, XYSeries> seriesMap = new HashMap<>();
-                seriesMap.put("BubbleSort", new XYSeries("BubbleSort"));
-                seriesMap.put("MergeSort", new XYSeries("MergeSort"));
-                seriesMap.put("QuickSort", new XYSeries("QuickSort"));
-                seriesMap.put("HeapSort", new XYSeries("HeapSort"));
-                seriesMap.put("InsertionSort", new XYSeries("InsertionSort"));
-                seriesMap.put("SelectionSort", new XYSeries("SelectionSort"));
+                ResultadoExecucao resCM = res.get("CM");
+                ResultadoExecucao resAGM = res.get("AGM_Kruskal"); 
+                ResultadoExecucao resFM = res.get("FM"); 
 
-                Map<Integer, Map<String, Double>> tabelaTempos = new LinkedHashMap<>();
-
-                /*for (int n : sizes) {
-                    Map<String, int[]> todasAsEntradas = Entradas.gerarTodasEntradas(n);
-                    int[] arrOriginal = todasAsEntradas.get(tipo);
-
-                    tabelaTempos.put(n, new LinkedHashMap<>());
-
-                    int[] arrBubble = arrOriginal.clone();
-                    long startBubble = System.nanoTime();
-                    BubbleSort.bubbleSort(arrBubble);
-                    long endBubble = System.nanoTime();
-                    double bubbleTime = (endBubble - startBubble) / 1_000_000.0;
-                    seriesMap.get("BubbleSort").add(n, bubbleTime);
-                    tabelaTempos.get(n).put("BubbleSort", bubbleTime);
-
-                    int[] arrMerge = arrOriginal.clone();
-                    long startMerge = System.nanoTime();
-                    MergeSort.mergeSort(arrMerge);
-                    long endMerge = System.nanoTime();
-                    double mergeTime = (endMerge - startMerge) / 1_000_000.0;
-                    seriesMap.get("MergeSort").add(n, mergeTime);
-                    tabelaTempos.get(n).put("MergeSort", mergeTime);
-
-                    int[] arrQuick = arrOriginal.clone();
-                    long startQuick = System.nanoTime();
-                    QuickSort.quickSort(arrQuick, 0, arrQuick.length - 1);
-                    long endQuick = System.nanoTime();
-                    double quickTime = (endQuick - startQuick) / 1_000_000.0;
-                    seriesMap.get("QuickSort").add(n, quickTime);
-                    tabelaTempos.get(n).put("QuickSort", quickTime);
-
-                    int[] arrHeap = arrOriginal.clone();
-                    long startHeap = System.nanoTime();
-                    HeapSort.heapSort(arrHeap);
-                    long endHeap = System.nanoTime();
-                    double heapTime = (endHeap - startHeap) / 1_000_000.0;
-                    seriesMap.get("HeapSort").add(n, heapTime);
-                    tabelaTempos.get(n).put("HeapSort", heapTime);
-
-                    int[] arrInsertion = arrOriginal.clone();
-                    long startInsertion = System.nanoTime();
-                    InsertionSort.insertionSort(arrInsertion);
-                    long endInsertion = System.nanoTime();
-                    double insertionTime = (endInsertion - startInsertion) / 1_000_000.0;
-                    seriesMap.get("InsertionSort").add(n, insertionTime);
-                    tabelaTempos.get(n).put("InsertionSort", insertionTime);
-
-                    int[] arrSelect = arrOriginal.clone();
-                    long startSelect = System.nanoTime();
-                    SelectSort.selectSort(arrSelect);
-                    long endSelect = System.nanoTime();
-                    double selectTime = (endSelect - startSelect) / 1_000_000.0;
-                    seriesMap.get("SelectionSort").add(n, selectTime);
-                    tabelaTempos.get(n).put("SelectionSort", selectTime);
-                }*/
-
-                PdfPTable table = new PdfPTable(7);
-                table.addCell("n");
-                table.addCell("BubbleSort (ms)");
-                table.addCell("InsertionSort (ms)");
-                table.addCell("SelectionSort (ms)");
-                table.addCell("MergeSort (ms)");
-                table.addCell("QuickSort (ms)");
-                table.addCell("HeapSort (ms)");
-
-                for (Integer n : tabelaTempos.keySet()) {
-                    table.addCell(String.valueOf(n));
-                    table.addCell(String.format("%.2f", tabelaTempos.get(n).get("BubbleSort")));
-                    table.addCell(String.format("%.2f", tabelaTempos.get(n).get("InsertionSort")));
-                    table.addCell(String.format("%.2f", tabelaTempos.get(n).get("SelectionSort")));
-                    table.addCell(String.format("%.2f", tabelaTempos.get(n).get("MergeSort")));
-                    table.addCell(String.format("%.2f", tabelaTempos.get(n).get("QuickSort")));
-                    table.addCell(String.format("%.2f", tabelaTempos.get(n).get("HeapSort")));
-                }
-
-                XYSeriesCollection dataset = new XYSeriesCollection();
-                dataset.addSeries(seriesMap.get("BubbleSort"));
-                dataset.addSeries(seriesMap.get("MergeSort"));
-                dataset.addSeries(seriesMap.get("QuickSort"));
-                dataset.addSeries(seriesMap.get("HeapSort"));
-                dataset.addSeries(seriesMap.get("InsertionSort"));
-                dataset.addSeries(seriesMap.get("SelectionSort"));
-
-                JFreeChart chart = ChartFactory.createXYLineChart(
-                        "Tempo de Execucao - " + tipo,
-                        "Tamanho do Vetor (n)",
-                        "Tempo (ms)",
-                        dataset);
-
-                ByteArrayOutputStream bas = new ByteArrayOutputStream();
-                ChartUtils.writeChartAsPNG(bas, chart, 500, 300);
-                Image chartImage = Image.getInstance(bas.toByteArray());
-
-                tables.add(table);
-                charts.add(chartImage);
-                labels.add(tipo);
+                table.addCell(String.valueOf(n));
+                table.addCell(String.valueOf(m));
+                table.addCell(String.valueOf(resCM.custo));
+                table.addCell(String.format("%.6f", resCM.tempoSegundos));
+                table.addCell(String.valueOf(resAGM.custo));
+                table.addCell(String.format("%.6f", resAGM.tempoSegundos));
+                table.addCell(String.valueOf(resFM.custo));
+                table.addCell(String.format("%.6f", resFM.tempoSegundos));
             }
-
+            
+            document.add(new Paragraph("Resultados da Execução (Instâncias: NY_dist, BAY_dist, COL_dist)"));
             document.add(new Paragraph(" "));
-            document.add(new Paragraph("Tabelas de Resultados", new Font(Font.FontFamily.HELVETICA, 16, Font.BOLD)));
+            document.add(table);
             document.add(new Paragraph(" "));
-
-            for (int i = 0; i < tables.size(); i++) {
-                document.add(
-                        new Paragraph("Tabela: " + labels.get(i), new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD)));
-                document.add(new Paragraph(" "));
-                document.add(tables.get(i));
-                document.add(new Paragraph(" "));
-            }
-
+            
+            document.add(new Paragraph("Sua Conclusão (Preencher esta seção com a análise dos resultados!)", headerFont));
             document.add(new Paragraph(" "));
-            document.add(new Paragraph("Gráficos de Comparação", new Font(Font.FontFamily.HELVETICA, 16, Font.BOLD)));
+            document.add(new Paragraph("Com base nos resultados obtidos para as instâncias de grafos (NY, BAY, COL), observamos que..."));
             document.add(new Paragraph(" "));
-
-            for (int i = 0; i < charts.size(); i++) {
-                document.add(
-                        new Paragraph("Gráfico: " + labels.get(i), new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD)));
-                document.add(new Paragraph(" "));
-                document.add(charts.get(i));
-                document.add(new Paragraph(" "));
-            }
-
+            
             document.close();
-            System.out.println("Relatorio PDF criado com sucesso!");
+            System.out.println("Relatorio PDF 'Relatorio_Grafos.pdf' criado com sucesso!");
 
         } catch (Exception e) {
             e.printStackTrace();

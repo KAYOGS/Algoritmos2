@@ -27,7 +27,7 @@ public class Dijkstra {
         }
     }
 
-    private Map<Integer, List<Aresta>> grafo;
+    private final Map<Integer, List<Aresta>> grafo;
 
     public Dijkstra() {
         this.grafo = new HashMap<>();
@@ -40,13 +40,19 @@ public class Dijkstra {
 
     public Map<Integer, Integer> encontrarMenorCaminho(int origem) {
         Map<Integer, Integer> distancias = new HashMap<>();
-
-        PriorityQueue<NoDistancia> filaPrioridade = new PriorityQueue<>(
-                (nd1, nd2) -> Integer.compare(nd1.distancia, nd2.distancia));
-
+        
         for (int vertice : grafo.keySet()) {
             distancias.put(vertice, Integer.MAX_VALUE);
         }
+
+        for (List<Aresta> arestas : grafo.values()) {
+            for (Aresta aresta : arestas) {
+                distancias.putIfAbsent(aresta.destino, Integer.MAX_VALUE);
+            }
+        }
+        
+        PriorityQueue<NoDistancia> filaPrioridade = new PriorityQueue<>(
+                (nd1, nd2) -> Integer.compare(nd1.distancia, nd2.distancia));
 
         distancias.put(origem, 0);
         filaPrioridade.add(new NoDistancia(origem, 0));

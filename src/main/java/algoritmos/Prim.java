@@ -30,8 +30,8 @@ public class Prim {
         }
     }
 
-    private Map<Integer, List<Aresta>> grafo;
-    private Set<Integer> vertices;
+    private final Map<Integer, List<Aresta>> grafo; // Adicionado 'final'
+    private final Set<Integer> vertices; // Adicionado 'final'
 
     public Prim() {
         this.grafo = new HashMap<>();
@@ -39,9 +39,11 @@ public class Prim {
     }
 
     public void adicionarAresta(int origem, int destino, int peso) {
+        // Adiciona arco de origem para destino
         grafo.putIfAbsent(origem, new ArrayList<>());
         grafo.get(origem).add(new Aresta(destino, peso));
 
+        // Adiciona arco reverso para tratar o grafo como NÃO DIRECIONADO
         grafo.putIfAbsent(destino, new ArrayList<>());
         grafo.get(destino).add(new Aresta(origem, peso));
 
@@ -53,13 +55,14 @@ public class Prim {
         int custoTotalAGM = 0;
 
         Set<Integer> naAGM = new HashSet<>();
-
-        Map<Integer, Integer> custoParaConectar = new HashMap<>();
+        // Armazena o custo mínimo da aresta que conecta o vértice ao conjunto naAGM
+        Map<Integer, Integer> custoParaConectar = new HashMap<>(); 
 
         PriorityQueue<NoCusto> filaPrioridade = new PriorityQueue<>(
                 (nc1, nc2) -> Integer.compare(nc1.custo, nc2.custo)
         );
 
+        // Inicializa o custo de todos os vértices como infinito
         for (int vertice : vertices) {
             custoParaConectar.put(vertice, Integer.MAX_VALUE);
         }
@@ -89,7 +92,8 @@ public class Prim {
 
                 if (!naAGM.contains(v) && pesoUV < custoParaConectar.get(v)) {
                     custoParaConectar.put(v, pesoUV);
-                    filaPrioridade.add(new NoCusto(v, pesoUV));
+                    // Adiciona/Atualiza o vértice na fila de prioridade
+                    filaPrioridade.add(new NoCusto(v, pesoUV)); 
                 }
             }
         }
